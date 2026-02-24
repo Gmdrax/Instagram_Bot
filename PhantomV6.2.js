@@ -13,7 +13,7 @@
             ACTION_BASE: 4000,
             BATCH_PAUSE: 300000 // 5 Minutos
         },
-        LIMITS: { SESSION: 50, BATCH: 50, MAX_ERRORS: 3, CIRCUIT_BREAK_MS: 900000 },
+        LIMITS: { SESSION: 150, BATCH: 50, MAX_ERRORS: 3, CIRCUIT_BREAK_MS: 900000 },
         FILTERS: { SKIP_VERIFIED: true, SKIP_NO_PIC: true }, 
         NO_PIC_IDS: ["44884218_345707102882519_2446069589734326272_n", "464760996_1254146839119862_3605321457742435801_n"],
         SYS_ID: 'ig_core_' + Math.random().toString(36).substring(2, 12),
@@ -327,10 +327,10 @@
     };
 
     // ==========================================
-    // 🖥️ NANO UI (FIXED IMAGES & IMPROVED GRID)
+    // 🖥️ NANO UI (ZERO-NETWORK-ERRORS DESIGN)
     // ==========================================
     const UI = {
-        dom: {}, shadow: null, logsArr: [], observer: null,
+        dom: {}, shadow: null, logsArr: [],
         css: `
             :host { --ac: #00ffcc; --bg: rgba(10, 10, 12, 0.98); --c-bg: rgba(20, 20, 24, 0.9); --txt: #e0e0e0; --mut: #888; --err: #ff4757; --suc: #2ed573; --brd: rgba(0, 255, 204, 0.2); }
             .sys { font-family: system-ui, sans-serif; user-select: none; background: var(--bg); backdrop-filter: blur(20px); border: 1px solid var(--brd); color: var(--txt); width: 480px; height: 720px; border-radius: 12px; box-shadow: 0 30px 60px rgba(0,0,0,0.9); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; flex-direction: column; }
@@ -346,12 +346,17 @@
             .grd { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; align-content: start; padding-right: 4px;}
             .crd { width: 100%; display: flex; flex-direction: column; gap: 6px; background: transparent; position: relative; cursor: pointer; opacity: 0.6; transition: 0.2s; box-sizing: border-box; }
             .crd:hover { opacity: 1; transform: translateY(-2px); z-index: 2; }
-            .img-wrap { width: 100%; aspect-ratio: 1; position: relative; border-radius: 8px; overflow: hidden; border: 2px solid transparent; background: var(--c-bg); transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+            
+            /* Avatar Tipográfico (Cero Errores de Red) */
+            .img-wrap { width: 100%; aspect-ratio: 1; position: relative; border-radius: 8px; overflow: hidden; border: 2px solid transparent; background: linear-gradient(135deg, rgba(30,30,36,1) 0%, rgba(15,15,18,1) 100%); transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+            .avatar-txt { font-size: 26px; font-weight: 900; color: rgba(255,255,255,0.2); text-transform: uppercase; letter-spacing: 1px; transition: 0.2s;}
             .crd.sel .img-wrap { border-color: var(--ac); box-shadow: 0 0 15px rgba(0,255,204,0.4); }
+            .crd.sel .avatar-txt { color: var(--ac); text-shadow: 0 0 10px rgba(0,255,204,0.5); }
+            
             .crd.ok { opacity: 0.3; filter: grayscale(100%); pointer-events:none;}
             .crd.err .img-wrap { border-color: var(--err); }
-            .crd img { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0; transition: opacity 0.3s; }
-            .crd img.loaded { opacity: 1; }
+            .crd.err .avatar-txt { color: var(--err); }
+            
             .name { font-size: 11px; text-align: center; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
             .badge { position: absolute; bottom: 4px; right: 4px; font-size: 9px; background: rgba(255, 71, 87, 0.9); color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 900; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(0,0,0,0.8); backdrop-filter: blur(2px); border: 1px solid rgba(255,255,255,0.2); z-index: 2; }
             
@@ -419,21 +424,6 @@
                 clr: $('#b-clr'), main: $('#main')
             };
 
-            // FIX CARGA IMÁGENES: Carga directa e indetectable.
-            this.observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target;
-                        if (img.dataset.src && !img.src) {
-                            img.src = img.dataset.src;
-                            img.onload = () => img.classList.add('loaded');
-                            img.onerror = () => { img.style.display='none'; img.parentNode.style.background='rgba(255,255,255,0.05)'; };
-                            this.observer.unobserve(img);
-                        }
-                    }
-                });
-            }, { root: this.dom.grd, rootMargin: '100px' });
-
             this.bindEvents();
             this.bindStoreEvents();
         },
@@ -483,7 +473,6 @@
             EventBus.on('POOL_UPDATED', (users) => {
                 const frag = document.createDocumentFragment();
                 if (this.dom.grd) this.dom.grd.innerHTML = ''; 
-                this.observer.disconnect(); 
                 
                 users.forEach(u => {
                     const div = document.createElement('div');
@@ -494,10 +483,12 @@
                     const wrap = document.createElement('div');
                     wrap.className = 'img-wrap';
                     
-                    const img = document.createElement('img');
-                    img.dataset.src = u.profile_pic_url; 
-                    img.setAttribute('referrerpolicy', 'no-referrer'); // Evasión de CORP/CORS
-                    wrap.appendChild(img);
+                    // AVATAR LIMPIO - Reemplaza la imagen por las iniciales del usuario
+                    const avatarTxt = document.createElement('div');
+                    avatarTxt.className = 'avatar-txt';
+                    // Extrae 1 o 2 letras del username para el diseño
+                    avatarTxt.textContent = u.username.replace(/[^a-zA-Z0-9]/g, '').substring(0, 2);
+                    wrap.appendChild(avatarTxt);
 
                     if (u.is_private) {
                         const badge = document.createElement('div');
@@ -517,7 +508,6 @@
                 
                 if (this.dom.grd) {
                     this.dom.grd.appendChild(frag);
-                    this.dom.grd.querySelectorAll('img').forEach(img => this.observer.observe(img));
                 }
             });
 
